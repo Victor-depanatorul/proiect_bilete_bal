@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block continut %}
+    <div class="auth-container">
+        <form id="signupForm" onsubmit="handleSignup(event)">
+            <h2>Sign Up</h2>
+            <input type="text" id="signName" placeholder="Nume complet" required>
+            <input type="email" id="signEmail" placeholder="Email" required>
+            <input type="password" id="signPass" placeholder="Parolă" required>
+            <button type="submit">Creează cont</button>
+
+            <p style="text-align: center; margin-top: 15px; font-size: 14px;">
+                Ai deja cont? <a href="{{ url_for('signin') }}" style="color: #007bff; text-decoration: none;">Intră în cont</a>
+            </p>
+        </form>
+    </div>
+{% endblock %}

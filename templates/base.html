@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cumparare/Gestiune bilete bal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">✨ Site bilete bal FMI</div>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}" class="nav-item">Acasă</a>
+            <a href="{{ url_for('bilete') }}" class="nav-item">Cumpără Bilet</a>
+
+            <a href="{{ url_for('signin') }}" id="btn-login" class="nav-item btn-outline">Sign In</a>
+            <a href="{{ url_for('signup') }}" id="btn-register" class="nav-item btn-primary">Sign Up</a>
+
+            <a href="{{ url_for('admin') }}" id="btn-admin" class="nav-item btn-admin hidden">Panou Admin</a>
+            <button onclick="logout()" id="btn-logout" class="nav-item btn-outline hidden">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block continut %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
