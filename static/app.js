@@ -3,55 +3,42 @@
 // ==========================================
 
 function updateNav() {
-    // Preluăm datele utilizatorului din localStorage
     const user = JSON.parse(localStorage.getItem('user'));
 
-    // Selectăm butoanele din navbar
     const btnLogin = document.getElementById('btn-login');
     const btnRegister = document.getElementById('btn-register');
     const btnLogout = document.getElementById('btn-logout');
     const btnAdmin = document.getElementById('btn-admin');
 
     if (user) {
-        // Dacă utilizatorul este logat, ascundem Sign In / Sign Up
         if(btnLogin) btnLogin.classList.add('hidden');
         if(btnRegister) btnRegister.classList.add('hidden');
-
-        // Afișăm butonul de Logout
         if(btnLogout) btnLogout.classList.remove('hidden');
 
-        // Dacă utilizatorul este admin (1 sau true în baza de date), afișăm butonul de Panou Admin
         if (btnAdmin && (user.este_admin === 1 || user.este_admin === true)) {
             btnAdmin.classList.remove('hidden');
         }
     } else {
-        // Dacă nu este logat, afișăm Sign In / Sign Up
         if(btnLogin) btnLogin.classList.remove('hidden');
         if(btnRegister) btnRegister.classList.remove('hidden');
-
-        // Ascundem Logout și Panou Admin
         if(btnLogout) btnLogout.classList.add('hidden');
         if(btnAdmin) btnAdmin.classList.add('hidden');
     }
 }
 
 function logout() {
-    // Ștergem sesiunea și redirecționăm către acasă
     localStorage.removeItem('user');
     window.location.href = '/';
 }
 
-// Rulăm verificarea la fiecare încărcare a oricărei pagini
 document.addEventListener('DOMContentLoaded', updateNav);
-
 
 // ==========================================
 // AUTENTIFICARE (SIGN IN / SIGN UP)
 // ==========================================
 
 async function handleLogin(e) {
-    e.preventDefault(); // Oprim reîncărcarea paginii generată de <form>
-
+    e.preventDefault();
     const email = document.getElementById('loginEmail').value;
     const parola = document.getElementById('loginPass').value;
 
@@ -64,25 +51,27 @@ async function handleLogin(e) {
         const res = await req.json();
 
         if (req.ok) {
-            // Salvăm datele returnate de server (id, email, este_admin etc.) în browser
             localStorage.setItem('user', JSON.stringify(res.user));
-            alert('Te-ai autentificat cu succes!');
-            window.location.href = '/'; // Redirecționare către pagina principală
+            window.location.href = '/';
         } else {
             alert(res.eroare || 'Date de logare incorecte.');
         }
     } catch (err) {
-        console.error("Eroare la request-ul de login:", err);
         alert("Eroare de conexiune cu serverul.");
     }
 }
 
 async function handleSignup(e) {
     e.preventDefault();
-
     const nume = document.getElementById('signName').value;
     const email = document.getElementById('signEmail').value;
     const parola = document.getElementById('signPass').value;
+    const errorDiv = document.getElementById('signupError');
+
+    if (errorDiv) {
+        errorDiv.classList.add('hidden');
+        errorDiv.innerText = '';
+    }
 
     try {
         const req = await fetch('/api/register', {
@@ -93,13 +82,21 @@ async function handleSignup(e) {
         const res = await req.json();
 
         if (req.ok) {
-            alert('Cont creat cu succes! Te rugăm să te loghezi.');
-            window.location.href = '/signin'; // Redirecționare către pagina de logare
+            alert(res.mesaj || 'Cont creat cu succes! Te rugăm să te loghezi.');
+            window.location.href = '/signin';
         } else {
-            alert(res.eroare || 'Eroare la crearea contului.');
+            if (errorDiv) {
+                errorDiv.innerText = res.eroare || 'Eroare la crearea contului.';
+                errorDiv.classList.remove('hidden');
+            } else {
+                alert(res.eroare || 'Eroare la crearea contului.');
+            }
         }
     } catch (err) {
-        console.error("Eroare la request-ul de inregistrare:", err);
+        if (errorDiv) {
+            errorDiv.innerText = "Eroare de conexiune.";
+            errorDiv.classList.remove('hidden');
+        }
     }
 }
 
@@ -116,8 +113,6 @@ async function cautaUtilizator() {
     try {
         const req = await fetch(`/api/admin/users?q=${encodeURIComponent(query)}`);
         const data = await req.json();
-
-        // Afișăm rezultatul JSON formatat frumos pe ecran
         div.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (err) {
         div.innerHTML = "<span style='color:red;'>Eroare rețea.</span>";
@@ -132,21 +127,52 @@ async function cautaTranzactie() {
     try {
         const req = await fetch(`/api/admin/transactions?q=${encodeURIComponent(query)}`);
         const data = await req.json();
-
         div.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (err) {
         div.innerHTML = "<span style='color:red;'>Eroare rețea.</span>";
     }
 }
 
-async function valideazaBilet() {
-    const uuid = document.getElementById('uuidBilet').value;
-    const msg = document.getElementById('mesajValidare');
-    msg.innerText = "Se validează...";
-    msg.style.color = "black";
+async function adaugaTranzactie() {
+    const email = document.getElementById('newTxEmail').value;
+    const nr_bilete = document.getElementById('newTxCount').value;
+
+    if (!email || !nr_bilete) {
+        alert("Introdu email-ul și numărul de bilete!");
+        return;
+    }
 
     try {
-        const req = await fetch('/api/admin/validate-ticket', {
+        const req = await fetch('/api/admin/add-transaction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, nr_bilete })
+        });
+
+        const res = await req.json();
+
+        if (req.ok) {
+            // Confirmă crearea și trimiterea UUID-ului pe email
+            alert(`${res.mesaj}\nUUID: ${res.uid_tranzactie}`);
+            document.getElementById('newTxEmail').value = '';
+            document.getElementById('newTxCount').value = '';
+        } else {
+            alert(res.eroare || "Eroare la emiterea tranzacției.");
+        }
+    } catch (err) {
+        alert("Eroare de conexiune cu serverul.");
+        console.error(err);
+    }
+}
+
+async function valideazaTranzactie() {
+    const uuid = document.getElementById('uuidTx').value;
+    const msg = document.getElementById('mesajValidare');
+    msg.innerText = "Se validează...";
+    msg.style.color = "white";
+
+    try {
+        const req = await fetch('/api/admin/validate-transaction', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uuid })
@@ -154,47 +180,46 @@ async function valideazaBilet() {
         const res = await req.json();
 
         if (req.ok) {
-            msg.style.color = "green";
-            msg.innerText = "Bilet valid! Acces permis.";
+            msg.style.color = "var(--success)";
+            msg.innerText = `Tranzacție validă! Acces permis pentru ${res.nr_bilete} persoane.`;
         } else if (res.deja_folosit) {
             msg.style.color = "orange";
-            msg.innerText = "ATENȚIE: Acest bilet a fost deja scanat/folosit!";
+            msg.innerText = "ATENȚIE: Această tranzacție a fost deja validată (revendicată)!";
         } else {
-            msg.style.color = "red";
-            msg.innerText = "Bilet invalid sau inexistent.";
+            msg.style.color = "var(--danger)";
+            msg.innerText = res.eroare || "Tranzacție invalidă sau inexistentă.";
         }
     } catch (err) {
-        msg.style.color = "red";
+        msg.style.color = "var(--danger)";
         msg.innerText = "Eroare de conexiune cu serverul.";
-        console.error(err);
     }
 }
 
-async function adaugaBilet() {
-    const email = document.getElementById('newTicketEmail').value;
-    const tip = document.getElementById('newTicketType').value;
+async function faAdmin() {
+    const email = document.getElementById('makeAdminEmail').value;
 
     if (!email) {
-        alert("Introdu un email valid!");
+        alert("Te rog să introduci un email!");
         return;
     }
 
     try {
-        const req = await fetch('/api/admin/add-ticket', {
+        const req = await fetch('/api/admin/make-user-admin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, tip })
+            body: JSON.stringify({ email })
         });
 
+        const res = await req.json();
+
         if (req.ok) {
-            alert("Bilet emis cu succes pentru " + email);
-            document.getElementById('newTicketEmail').value = ''; // Golim câmpul
+            alert("Utilizatorul a primit rolul de administrator cu succes!");
+            document.getElementById('makeAdminEmail').value = '';
         } else {
-            const res = await req.json();
-            alert(res.eroare || "Eroare la emiterea biletului.");
+            alert(res.eroare || "Eroare la modificarea rolului.");
         }
     } catch (err) {
+        alert("Eroare de conexiune cu serverul.");
         console.error(err);
-        alert("Eroare de conexiune.");
     }
 }

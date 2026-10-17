@@ -4,6 +4,9 @@
     <div class="auth-container">
         <form id="signupForm" onsubmit="handleSignup(event)">
             <h2>Sign Up</h2>
+
+            <div id="signupError" class="hidden" style="color: #ef4444; font-size: 0.9rem; text-align: center; margin-bottom: 10px;"></div>
+
             <input type="text" id="signName" placeholder="Nume complet" required>
             <input type="email" id="signEmail" placeholder="Email" required>
             <input type="password" id="signPass" placeholder="Parolă" required>
