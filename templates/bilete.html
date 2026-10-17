@@ -3,23 +3,36 @@
 {% block continut %}
     <h2 style="text-align: center;">Cumpără Bilete</h2>
 
-    <!-- Containerul care apare DOAR dacă utilizatorul este logat -->
-    <div id="buy-section" class="auth-container hidden" style="flex-direction: column; align-items: center;">
-        <div style="background: var(--card-bg); padding: 40px; border-radius: 16px; text-align: center; max-width: 500px; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <div id="status-msg" class="hidden" style="text-align: center; margin: 20px auto; max-width: 500px; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);"></div>
+
+    <!-- Apare DOAR dacă serverul spune că ești logat -->
+    <div id="buy-section" class="auth-container hidden" style="flex-direction: column; align-items: center; gap: 24px;">
+        <div style="background: var(--card-bg); padding: 40px; border-radius: 16px; text-align: center; max-width: 500px; width: 100%; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
 
             <h3 style="margin-bottom: 15px; font-size: 1.5rem;">Finalizare Achiziție</h3>
 
             <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 25px; line-height: 1.6;">
-                Momentan, plățile se verifică manual. Pentru a primi biletele, te rugăm să completezi formularul de plată.
-                <br><br>
-                <span style="color: #ef4444; font-weight: 600;">Important:</span> În formular, folosește <b>exact aceeași adresă de email</b> cu care te-ai înregistrat pe acest site! Un admin va verifica plata și îți va genera automat biletele pe acel email.
+                Plata se face securizat cu cardul, prin Stripe. După confirmare, primești biletele pe emailul contului tău.
             </p>
 
-            <!-- Aici înlocuiești # cu link-ul tău real către Google Forms / alt formular -->
-            <a href="#" target="_blank" onclick="alert('Acesta este un buton dummy. Aici vei pune link-ul către Google Form-ul tău în atributul href!');" class="dummy-link" style="padding: 14px 28px; font-size: 1.1rem;">
-                Mergi la Formularul de Plată
-            </a>
+            <div style="margin-bottom: 20px;">
+                <label for="nr-bilete" style="display: block; margin-bottom: 8px;">Număr de bilete (max {{ max_bilete }})</label>
+                <input type="number" id="nr-bilete" min="1" max="{{ max_bilete }}" value="1"
+                       style="padding: 10px; border-radius: 8px; width: 100px; text-align: center; font-size: 1.1rem;">
+            </div>
 
+            <p style="margin-bottom: 20px; font-size: 1.1rem;">
+                Total: <b id="total">{{ "%g"|format(pret) }}</b> RON
+            </p>
+
+            <button id="btn-plata" class="dummy-link" style="padding: 14px 28px; font-size: 1.1rem; cursor: pointer; border: none;">
+                Plătește cu cardul
+            </button>
+        </div>
+
+        <div id="tranzactii-box" class="hidden" style="background: var(--card-bg); padding: 30px; border-radius: 16px; max-width: 500px; width: 100%; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <h3 style="margin-bottom: 15px;">Biletele mele</h3>
+            <div id="tranzactii-lista" style="font-size: 0.95rem; line-height: 1.8; word-break: break-all;"></div>
         </div>
     </div>
 
@@ -28,16 +41,101 @@
         <p style="font-size: 1.1rem; margin-bottom: 15px;">Trebuie să fii autentificat pentru a cumpăra bilete.</p>
         <a href="{{ url_for('signin') }}" class="dummy-link" style="background: transparent; border: 1px solid var(--accent-1); color: var(--accent-1);">Mergi la Autentificare</a>
     </div>
-
+    <div id="cfg" data-pret="{{ pret }}" data-max="{{ max_bilete }}" hidden></div>
     <script>
-        // Logica de afișare bazată pe sesiune
-        document.addEventListener('DOMContentLoaded', () => {
-            const user = JSON.parse(localStorage.getItem('user'));
-            if (user) {
-                // Afișăm secțiunea cu butonul de formular, ascundem avertismentul de login
-                document.getElementById('buy-section').classList.remove('hidden');
-                document.getElementById('buy-section').style.display = 'flex';
-                document.getElementById('login-warning').classList.add('hidden');
+    const cfg = document.getElementById('cfg').dataset;
+    const PRET = parseFloat(cfg.pret);
+    const MAX_BILETE = parseInt(cfg.max, 10);
+
+        function arataMesaj(text) {
+            const el = document.getElementById('status-msg');
+            el.textContent = text;
+            el.classList.remove('hidden');
+        }
+
+        function actualizeazaTotal() {
+            const n = parseInt(document.getElementById('nr-bilete').value, 10);
+            const valid = Number.isInteger(n) && n >= 1 && n <= MAX_BILETE;
+            // Doar afișare; suma reală e stabilită pe server
+            document.getElementById('total').textContent = valid ? (PRET * n).toString() : '-';
+        }
+
+        async function incarcaTranzactii() {
+            try {
+                const r = await fetch('/api/tranzactiile-mele');
+                if (!r.ok) return;
+                const lista = await r.json();
+                const box = document.getElementById('tranzactii-box');
+                const cont = document.getElementById('tranzactii-lista');
+                cont.innerHTML = '';
+                if (lista.length === 0) { box.classList.add('hidden'); return; }
+                lista.forEach(t => {
+                    const rand = document.createElement('div');
+                    rand.textContent = t.nr_bilete + ' bilet(e) · ' +
+                        (t.revendicat ? 'folosit' : 'nefolosit') + ' · cod: ' + t.uuid;
+                    cont.appendChild(rand);
+                });
+                box.classList.remove('hidden');
+            } catch (e) { /* ignorat: lista se reîncarcă la următoarea vizită */ }
+        }
+
+        async function pornestePlata() {
+            const n = parseInt(document.getElementById('nr-bilete').value, 10);
+            if (!Number.isInteger(n) || n < 1 || n > MAX_BILETE) {
+                arataMesaj('Alege între 1 și ' + MAX_BILETE + ' bilete.');
+                return;
+            }
+            const btn = document.getElementById('btn-plata');
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nr_bilete: n })   // doar numărul, niciodată prețul
+                });
+                const data = await r.json();
+                if (r.ok && data.url) {
+                    window.location.href = data.url;         // redirecționare la Stripe
+                    return;
+                }
+                arataMesaj(data.eroare || 'Nu am putut iniția plata.');
+            } catch (e) {
+                arataMesaj('Eroare de rețea. Încearcă din nou.');
+            }
+            btn.disabled = false;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('nr-bilete').addEventListener('input', actualizeazaTotal);
+            document.getElementById('btn-plata').addEventListener('click', pornestePlata);
+
+            // Cine e logat se decide pe server, nu din localStorage
+            let user = null;
+            try {
+                const r = await fetch('/api/me');
+                user = (await r.json()).user;
+            } catch (e) {}
+
+            if (!user) return;
+
+            const buy = document.getElementById('buy-section');
+            buy.classList.remove('hidden');
+            buy.style.display = 'flex';
+            document.getElementById('login-warning').classList.add('hidden');
+
+            await incarcaTranzactii();
+
+            const plata = new URLSearchParams(window.location.search).get('plata');
+            if (plata === 'anulat') {
+                arataMesaj('Plata a fost anulată. Nu ai fost taxat.');
+            } else if (plata === 'succes') {
+                arataMesaj('Plata a fost primită. Biletele apar mai jos în câteva secunde și le primești și pe email.');
+                // Webhook-ul Stripe poate întârzia puțin: reîncărcăm lista de câteva ori
+                let incercari = 0;
+                const timer = setInterval(() => {
+                    incarcaTranzactii();
+                    if (++incercari >= 10) clearInterval(timer);
+                }, 3000);
             }
         });
     </script>
