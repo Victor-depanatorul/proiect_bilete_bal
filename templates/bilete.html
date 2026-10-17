@@ -1,44 +1,21 @@
 {% extends 'base.html' %}
 
 {% block continut %}
-    <h2 style="text-align: center;">Cumpără Bilete</h2>
+    <h2>Bilete Acces</h2>
 
-    <!-- Containerul care apare DOAR dacă utilizatorul este logat -->
-    <div id="buy-section" class="auth-container hidden" style="flex-direction: column; align-items: center;">
-        <div style="background: var(--card-bg); padding: 40px; border-radius: 16px; text-align: center; max-width: 500px; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    <p id="mesajPlata"></p>
 
-            <h3 style="margin-bottom: 15px; font-size: 1.5rem;">Finalizare Achiziție</h3>
-
-            <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 25px; line-height: 1.6;">
-                Momentan, plățile se verifică manual. Pentru a primi biletele, te rugăm să completezi formularul de plată.
-                <br><br>
-                <span style="color: #ef4444; font-weight: 600;">Important:</span> În formular, folosește <b>exact aceeași adresă de email</b> cu care te-ai înregistrat pe acest site! Un admin va verifica plata și îți va genera automat biletele pe acel email.
-            </p>
-
-            <!-- Aici înlocuiești # cu link-ul tău real către Google Forms / alt formular -->
-            <a href="#" target="_blank" onclick="alert('Acesta este un buton dummy. Aici vei pune link-ul către Google Form-ul tău în atributul href!');" class="dummy-link" style="padding: 14px 28px; font-size: 1.1rem;">
-                Mergi la Formularul de Plată
-            </a>
-
+    <div class="admin-grid">
+        {% for tip, info in preturi.items() %}
+        <div class="admin-card">
+            <h3>{{ tip|capitalize }}</h3>
+            <p>{{ info.nume }}</p>
+            <p><strong>{{ "%.2f"|format(info.suma) }} RON</strong></p>
+            <button onclick="cumpara('{{ tip }}')">Cumpără</button>
         </div>
+        {% endfor %}
     </div>
 
-    <!-- Mesajul care apare dacă NU este logat -->
-    <div id="login-warning" style="text-align: center; margin-top: 50px;">
-        <p style="font-size: 1.1rem; margin-bottom: 15px;">Trebuie să fii autentificat pentru a cumpăra bilete.</p>
-        <a href="{{ url_for('signin') }}" class="dummy-link" style="background: transparent; border: 1px solid var(--accent-1); color: var(--accent-1);">Mergi la Autentificare</a>
-    </div>
-
-    <script>
-        // Logica de afișare bazată pe sesiune
-        document.addEventListener('DOMContentLoaded', () => {
-            const user = JSON.parse(localStorage.getItem('user'));
-            if (user) {
-                // Afișăm secțiunea cu butonul de formular, ascundem avertismentul de login
-                document.getElementById('buy-section').classList.remove('hidden');
-                document.getElementById('buy-section').style.display = 'flex';
-                document.getElementById('login-warning').classList.add('hidden');
-            }
-        });
-    </script>
+    <h3 style="margin-top: 40px;">Biletele mele</h3>
+    <div id="biletele" class="admin-grid"></div>
 {% endblock %}
