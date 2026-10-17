@@ -2,97 +2,117 @@
 
 {% block continut %}
 <style>
-    .hero {
-        text-align: center;
-        padding: 60px 20px 40px;
+    .hero { text-align: center; padding: 40px 0 0; }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 14px; }
+    .hero p { color: var(--text-muted, #9ca3af); max-width: 620px; margin: 0 auto 26px; line-height: 1.7; }
+
+    /* Evantaiul de poze: se suprapun si se rotesc in jurul unui punct de jos */
+    .evantai {
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        padding: 80px 10px 50px;
+        overflow: hidden;
     }
-    .hero h1 {
-        font-size: 2.6rem;
-        font-weight: 700;
-        margin-bottom: 12px;
+
+    .carte {
+        --w: clamp(100px, 16vw, 180px);
+        --unghi: calc(var(--i) * 9deg);
+        --jos: calc(var(--i) * var(--i) * 7px);
+        width: var(--w);
+        aspect-ratio: 2 / 3;
+        margin-left: calc(var(--w) * -0.42);
+        border: 6px solid #f8f6f1;
+        border-radius: 14px;
+        background:
+            var(--img) center / cover no-repeat,
+            linear-gradient(160deg, var(--accent-1, #8b5cf6), #1f1b3a);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+        transform-origin: 50% 130%;
+        transform: rotate(var(--unghi)) translateY(var(--jos));
+        transition: transform 0.25s ease, box-shadow 0.25s ease, outline-color 0.25s ease;
+        outline: 3px solid transparent;
+        cursor: pointer;
+        position: relative;
+        z-index: 1;
     }
-    .hero .subtitlu {
-        font-size: 1.15rem;
-        font-weight: 300;
-        opacity: 0.85;
-        max-width: 620px;
-        margin: 0 auto 28px;
-        line-height: 1.6;
+    .carte:first-child { margin-left: 0; }
+
+    .carte:hover,
+    .carte:focus-visible {
+        transform: rotate(var(--unghi)) translateY(calc(var(--jos) - 40px)) scale(1.1);
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55), 0 0 22px var(--accent-1, #8b5cf6);
+        outline-color: var(--accent-1, #8b5cf6);
+        z-index: 10;
     }
-    .hero .cta {
-        display: inline-block;
-        padding: 14px 34px;
-        border-radius: 999px;
-        font-weight: 600;
-        text-decoration: none;
-        background: linear-gradient(135deg, #8e44ad, #e84393);
-        color: #fff;
-        transition: transform .2s, box-shadow .2s;
-    }
-    .hero .cta:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(232, 67, 147, .35);
-    }
-    .detalii {
+
+    /* Descrierea de sub poze */
+    .info {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 20px;
-        margin: 40px 0;
+        margin: 10px 0 36px;
     }
-    .card-info {
-        padding: 24px;
+    .info-card {
+        background: var(--card-bg, #1b2236);
+        border: 1px solid rgba(255, 255, 255, 0.05);
         border-radius: 16px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 26px 22px;
         text-align: center;
     }
-    .card-info .icon { font-size: 2rem; margin-bottom: 8px; }
-    .card-info h3 { margin: 0 0 6px; font-weight: 600; }
-    .card-info p { margin: 0; opacity: 0.8; line-height: 1.5; }
-    .descriere {
+    .info-card .icon { font-size: 1.8rem; margin-bottom: 8px; }
+    .info-card h3 { margin-bottom: 8px; }
+    .info-card p { color: var(--text-muted, #9ca3af); line-height: 1.6; font-size: 0.95rem; }
+
+    .despre {
         max-width: 760px;
-        margin: 0 auto;
+        margin: 0 auto 50px;
         text-align: center;
         line-height: 1.8;
-        font-weight: 300;
+        color: var(--text-muted, #9ca3af);
     }
+
+    @media (max-width: 800px) { .info { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+        .carte { --unghi: calc(var(--i) * 7deg); margin-left: calc(var(--w) * -0.5); }
+    }
+    @media (prefers-reduced-motion: reduce) { .carte { transition: none; } }
 </style>
 
 <section class="hero">
     <h1>✨ Balul Bobocilor FMI</h1>
-    <p class="subtitlu">
-        Seara în care noii studenți ai facultății se cunosc, dansează și
-        încep anul universitar așa cum trebuie: cu muzică bună, oameni faini
-        și amintiri pe care le vei povesti mult timp.
-    </p>
-    <a href="{{ url_for('bilete') }}" class="cta">Cumpără bilet</a>
+    <p>Seara în care noii studenți ai facultății se cunosc, dansează și încep anul universitar așa cum trebuie: cu muzică bună, oameni faini și amintiri pe care le vei povesti mult timp.</p>
+    <a href="{{ url_for('bilete') }}" class="dummy-link" style="padding: 14px 28px; font-size: 1.1rem;">Cumpără bilet</a>
 </section>
 
-<section class="detalii">
-    <div class="card-info">
+<!-- Pozele tale: static/img/poza1.jpg ... poza5.jpg -->
+<section class="evantai" aria-label="Galerie foto">
+    <div class="carte" tabindex="0" style="--i:-2; --img:url('{{ url_for('static', filename='img/poza1.jpg') }}')"></div>
+    <div class="carte" tabindex="0" style="--i:-1; --img:url('{{ url_for('static', filename='img/poza2.jpg') }}')"></div>
+    <div class="carte" tabindex="0" style="--i:0;  --img:url('{{ url_for('static', filename='img/poza3.jpg') }}')"></div>
+    <div class="carte" tabindex="0" style="--i:1;  --img:url('{{ url_for('static', filename='img/poza4.jpg') }}')"></div>
+    <div class="carte" tabindex="0" style="--i:2;  --img:url('{{ url_for('static', filename='img/poza5.jpg') }}')"></div>
+</section>
+
+<section class="info">
+    <div class="info-card">
         <div class="icon">📅</div>
-        <h3>Când ? </h3>
+        <h3>Când ?</h3>
         <p>Evenimentul va avea loc pe data de 25 noiembrie 2026.</p>
     </div>
-    <div class="card-info">
+    <div class="info-card">
         <div class="icon">📍</div>
-        <h3>Unde ? </h3>
+        <h3>Unde ?</h3>
         <p>Vă așteptăm cu mare drag la club One, să ne distrăm împreună!</p>
     </div>
-    <div class="card-info">
+    <div class="info-card">
         <div class="icon">🎟️</div>
         <h3>Bilete</h3>
         <p>Cumperi online, primești un cod unic și îl prezinți la intrare.</p>
     </div>
 </section>
 
-<section class="descriere">
-    <p>
-        Balul Bobocilor este una dintre cele mai așteptate seri ale anului
-        la FMI. Te așteaptă muzică, concursuri, alegerea viitorilor Miss și
-        Mister și o atmosferă în care e imposibil să nu te simți bine.
-        Fie că ești boboc sau student în an mai mare, te așteptăm să
-        petrecem împreună.
-    </p>
-</section>
+<p class="despre">
+    Balul Bobocilor este una dintre cele mai așteptate seri ale anului la FMI. Te așteaptă muzică, concursuri, alegerea viitorilor Miss și Mister și o atmosferă în care e imposibil să nu te simți bine. Fie că ești boboc sau student în an mai mare, te așteptăm să petrecem împreună.
+</p>
 {% endblock %}
