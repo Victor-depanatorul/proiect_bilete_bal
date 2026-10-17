@@ -13,26 +13,28 @@
 
         <div class="admin-card">
             <h3>Caută Tranzacții</h3>
-            <input type="text" id="searchTx" placeholder="ID Tranzacție / Email Client">
+            <input type="text" id="searchTx" placeholder="UUID Tranzacție / Email">
             <button onclick="cautaTranzactie()">Caută</button>
             <div id="rezultatTx"></div>
         </div>
 
         <div class="admin-card">
-            <h3>Validează Bilet la Intrare</h3>
-            <input type="text" id="uuidBilet" placeholder="UUID Bilet">
-            <button onclick="valideazaBilet()">Validează</button>
-            <p id="mesajValidare"></p>
+            <h3>Validează Tranzacție (Intrare)</h3>
+            <input type="text" id="uuidTx" placeholder="Introdu UUID-ul tranzacției">
+            <button onclick="valideazaTranzactie()">Validează Accesul</button>
+            <p id="mesajValidare" style="margin-top: 10px; font-weight: 600;"></p>
         </div>
 
         <div class="admin-card">
-            <h3>Emite Bilet Manual</h3>
-            <input type="email" id="newTicketEmail" placeholder="Email Utilizator">
-            <select id="newTicketType">
-                <option value="standard">Standard</option>
-                <option value="vip">VIP</option>
-            </select>
-            <button onclick="adaugaBilet()">Emite Bilet</button>
+            <h3>Înregistrează Tranzacție Manual</h3>
+            <input type="email" id="newTxEmail" placeholder="Email Utilizator">
+            <input type="number" id="newTxCount" placeholder="Număr bilete" min="1">
+            <button onclick="adaugaTranzactie()">Emite Tranzacție</button>
         </div>
     </div>
+    <div class="admin-card">
+    <h3>Acordă Rol de Administrator</h3>
+    <input type="email" id="makeAdminEmail" placeholder="Email Utilizator">
+    <button onclick="faAdmin()">Acordă Admin</button>
+</div>
 {% endblock %}
