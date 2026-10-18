@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block continut %}
+    <div class="auth-container" style="flex-direction: column; align-items: center; justify-content: center; min-height: 60vh;">
+        <div style="background: var(--card-bg); padding: 40px; border-radius: 16px; text-align: center; max-width: 450px; width: 100%; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <h2 style="margin-bottom: 10px;">Verificare Email</h2>
+            
+            <p style="margin-bottom: 25px; color: var(--text-muted); font-size: 0.95rem; line-height: 1.5;">
+                Am trimis un cod de 6 cifre pe adresa ta de email. Te rugăm să-l introduci mai jos pentru a activa contul.
+            </p>
+            
+            <form id="verifyForm" onsubmit="handleVerify(event)">
+                <input type="hidden" id="verifyEmail" value="{{ email }}">
+                <input type="text" id="verifyCode" placeholder="Cod (ex: 123456)" required pattern="\d{6}" maxlength="6" 
+                       style="text-align: center; letter-spacing: 8px; font-size: 1.5rem; font-weight: bold; margin-bottom: 15px;">
+                <button type="submit" style="width: 100%; padding: 12px; font-size: 1.1rem;">Validează Contul</button>
+            </form>
+            
+            <div id="verifyError" class="hidden" style="color: #ef4444; font-size: 0.9rem; text-align: center; margin-top: 15px; font-weight: 600;"></div>
+        </div>
+    </div>
+
+    <script>
+        async function handleVerify(e) {
+            e.preventDefault();
+            const email = document.getElementById('verifyEmail').value;
+            const cod = document.getElementById('verifyCode').value;
+            const errorDiv = document.getElementById('verifyError');
+
+            if (!email) return;
+
+            try {
+                const req = await fetch('/api/verify-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, cod })
+                });
+                const res = await req.json();
+
+                if (req.ok) {
+                    alert("Cont validat cu succes! Acum te poți autentifica.");
+                    window.location.href = '/signin';
+                } else {
+                    errorDiv.innerText = res.eroare || "Cod invalid.";
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = "Eroare de conexiune cu serverul.";
+                errorDiv.classList.remove('hidden');
+            }
+        }
+    </script>
+{% endblock %}
