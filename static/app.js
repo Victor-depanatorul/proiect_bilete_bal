@@ -2,8 +2,16 @@
 // GESTIUNE SESIUNE ȘI NAVIGAȚIE
 // ==========================================
 
-function updateNav() {
-    const user = JSON.parse(localStorage.getItem('user'));
+async function updateNav() {
+    let user = null;
+    try {
+        const r = await fetch('/api/me');
+        if (r.ok) {
+            user = (await r.json()).user;
+        }
+    } catch (e) {
+        console.error("Eroare verificare sesiune", e);
+    }
 
     const btnLogin = document.getElementById('btn-login');
     const btnRegister = document.getElementById('btn-register');
@@ -26,8 +34,10 @@ function updateNav() {
     }
 }
 
-function logout() {
-    localStorage.removeItem('user');
+async function logout() {
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+    } catch (e) {}
     window.location.href = '/';
 }
 
@@ -51,10 +61,14 @@ async function handleLogin(e) {
         const res = await req.json();
 
         if (req.ok) {
-            localStorage.setItem('user', JSON.stringify(res.user));
             window.location.href = '/';
         } else {
-            alert(res.eroare || 'Date de logare incorecte.');
+            if (res.necesita_verificare) {
+                // REDIRECȚIONARE CĂTRE VERIFY
+                window.location.href = '/verify';
+            } else {
+                alert(res.eroare || 'Date de logare incorecte.');
+            }
         }
     } catch (err) {
         alert("Eroare de conexiune cu serverul.");
@@ -66,11 +80,23 @@ async function handleSignup(e) {
     const nume = document.getElementById('signName').value;
     const email = document.getElementById('signEmail').value;
     const parola = document.getElementById('signPass').value;
+    const parolaConfirm = document.getElementById('signPassConfirm').value; // Preluăm a doua parolă
     const errorDiv = document.getElementById('signupError');
 
     if (errorDiv) {
         errorDiv.classList.add('hidden');
         errorDiv.innerText = '';
+    }
+
+    // NOU: Verificăm dacă parolele coincid
+    if (parola !== parolaConfirm) {
+        if (errorDiv) {
+            errorDiv.innerText = 'Parolele nu coincid!';
+            errorDiv.classList.remove('hidden');
+        } else {
+            alert('Parolele nu coincid!');
+        }
+        return; // Oprim execuția, nu mai trimitem datele la server
     }
 
     try {
@@ -82,8 +108,8 @@ async function handleSignup(e) {
         const res = await req.json();
 
         if (req.ok) {
-            alert(res.mesaj || 'Cont creat cu succes! Te rugăm să te loghezi.');
-            window.location.href = '/signin';
+            // REDIRECȚIONARE CĂTRE VERIFY
+            window.location.href = '/verify';
         } else {
             if (errorDiv) {
                 errorDiv.innerText = res.eroare || 'Eroare la crearea contului.';
@@ -99,7 +125,6 @@ async function handleSignup(e) {
         }
     }
 }
-
 
 // ==========================================
 // FUNCȚII PENTRU PANOUL DE ADMINISTRATOR
@@ -152,7 +177,6 @@ async function adaugaTranzactie() {
         const res = await req.json();
 
         if (req.ok) {
-            // Confirmă crearea și trimiterea UUID-ului pe email
             alert(`${res.mesaj}\nUUID: ${res.uid_tranzactie}`);
             document.getElementById('newTxEmail').value = '';
             document.getElementById('newTxCount').value = '';

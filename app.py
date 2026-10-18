@@ -19,7 +19,7 @@ load_dotenv()
 # (o valoare lungă și aleatoare), nu o lăsa pe cea de dezvoltare.
 app.secret_key = os.getenv("SECRET_KEY", "dev-only-schimba-ma")
 app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,   # JavaScript nu poate citi cookie-ul
+    SESSION_COOKIE_HTTPONLY=True,  # JavaScript nu poate citi cookie-ul
     SESSION_COOKIE_SAMESITE="Lax",  # protecție de bază împotriva CSRF
 )
 
@@ -30,14 +30,12 @@ DB_PASS = os.getenv("DB_PASS")
 DB_DSN = os.getenv("DB_DSN")
 pool = oracledb.create_pool(user=DB_USER, password=DB_PASS, dsn=DB_DSN, min=2, max=5, increment=1)
 
-
 # CONFIGURARE EMAIL
 
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-
 
 # CONFIGURARE PLĂȚI (Stripe)
 
@@ -47,9 +45,9 @@ BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
 
 # Prețul se stabilește PE SERVER (din .env sau valoarea de mai jos).
 # Browserul trimite doar numărul de bilete, niciodată suma.
-PRET_BILET = float(os.getenv("PRET_BILET", "50"))   # RON / bilet
+PRET_BILET = float(os.getenv("PRET_BILET", "50"))  # RON / bilet
 MONEDA = "ron"
-MAX_BILETE = 6                                       # maxim bilete / comandă
+MAX_BILETE = 6  # maxim bilete / comandă
 
 
 def trimitere_email_generic(subiect, mesaj, destinatar):
@@ -91,11 +89,13 @@ def login_required(f):
         if not session.get("user_id"):
             return jsonify({"eroare": "Trebuie să fii autentificat"}), 401
         return f(*args, **kwargs)
+
     return wrapper
 
 
 def admin_required(f):
     """Pentru rutele API de admin: 401 dacă nu ești logat, 403 dacă nu ești admin."""
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not session.get("user_id"):
@@ -103,11 +103,13 @@ def admin_required(f):
         if not session.get("este_admin"):
             return jsonify({"eroare": "Acces interzis"}), 403
         return f(*args, **kwargs)
+
     return wrapper
 
 
 def admin_page_required(f):
     """Pentru pagina /admin: redirecționează în loc să dea JSON."""
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not session.get("user_id"):
@@ -115,6 +117,7 @@ def admin_page_required(f):
         if not session.get("este_admin"):
             return redirect(url_for("home"))
         return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -130,6 +133,15 @@ def signin(): return render_template('signin.html')
 
 @app.route('/signup')
 def signup(): return render_template('signup.html')
+
+
+@app.route('/verify')
+def verify():
+    # Verificăm dacă există un email în așteptare în sesiune
+    pending_email = session.get('pending_email')
+    if not pending_email:
+        return redirect(url_for('signin'))
+    return render_template('verify.html', email=pending_email)
 
 
 @app.route('/bilete')
@@ -172,6 +184,10 @@ def api_register():
                 connection.commit()
 
                 succes = trimite_email_verificare(email, cod_generat)
+
+                # Salvăm email-ul în sesiune pentru a-i permite accesul la /verify
+                session['pending_email'] = email
+
                 if not succes:
                     return jsonify({"mesaj": "Cont creat, dar email-ul cu codul nu a putut fi trimis."}), 201
 
@@ -198,6 +214,10 @@ def api_verify_email():
                     "UPDATE utilizator SET cont_verificat = 1, cod_verificare = NULL WHERE id_utilizator = :id",
                     id=id_user)
                 connection.commit()
+
+                # Ștergem flag-ul temporar din sesiune
+                session.pop('pending_email', None)
+
                 return jsonify({"mesaj": "Cont validat cu succes!"}), 200
             else:
                 return jsonify({"eroare": "Cod incorect sau cont deja validat!"}), 400
@@ -216,12 +236,22 @@ def api_login():
             user_row = cursor.fetchone()
 
     if user_row and check_password_hash(user_row[3], parola_raw):
+        cont_verificat = int(user_row[4] or 0)
+
+        if cont_verificat == 0:
+            # Salvăm temporar email-ul în sesiune pentru pagina de verificare
+            session['pending_email'] = user_row[1]
+            return jsonify({
+                "eroare": "Contul tău nu este verificat. Vei fi redirecționat.",
+                "necesita_verificare": True
+            }), 403
+
         # Sesiunea trăiește pe server (cookie semnat); browserul nu o poate modifica
         session.clear()
         session['user_id'] = user_row[0]
         session['email'] = user_row[1]
         session['este_admin'] = int(user_row[2] or 0)
-        session['cont_verificat'] = int(user_row[4] or 0)
+        session['cont_verificat'] = cont_verificat
 
         user_data = {
             "id": user_row[0],
@@ -258,7 +288,6 @@ def api_me():
 @app.route('/api/checkout', methods=['POST'])
 @login_required
 def api_checkout():
-    """Creează sesiunea Stripe Checkout. Tranzacția se înregistrează abia după plată (webhook)."""
     if not stripe.api_key:
         return jsonify({"eroare": "Plățile nu sunt configurate pe server"}), 500
 
@@ -299,7 +328,6 @@ def api_checkout():
 
 
 def proceseaza_plata_reusita(sesiune):
-    """După o plată confirmată: înregistrează tranzacția și trimite UUID-ul pe email."""
     meta = sesiune.get('metadata') or {}
     try:
         id_user = int(meta.get('id_utilizator'))
@@ -308,23 +336,21 @@ def proceseaza_plata_reusita(sesiune):
         app.logger.warning("Webhook fără metadata validă")
         return
 
-    # Suma plătită trebuie să fie exact cea așteptată
     if sesiune.get('amount_total') != int(round(PRET_BILET * 100)) * nr_bilete:
         app.logger.error("Sumă neașteptată pentru sesiunea %s", sesiune.get('id'))
         return
 
-    # UUID-ul e derivat din ID-ul sesiunii Stripe: dacă webhook-ul vine de două ori
-    # (Stripe retrimite), obținem același UUID și nu emitem tranzacția a doua oară.
-    # Astfel nu e nevoie de nicio coloană nouă în baza de date.
     uid_tranzactie = hashlib.sha256(sesiune['id'].encode()).hexdigest()[:32]
 
     with pool.acquire() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT 1 FROM tranzactie WHERE uuid_tranzactie = :uid", uid=uid_tranzactie)
+            # Înlocuit :uid cu :uuid_val
+            cursor.execute("SELECT 1 FROM tranzactie WHERE uuid_tranzactie = :uuid_val", uuid_val=uid_tranzactie)
             if cursor.fetchone():
-                return  # deja procesată
+                return
 
-            cursor.execute("SELECT email FROM utilizator WHERE id_utilizator = :id", id=id_user)
+            # Înlocuit :id cu :id_usr
+            cursor.execute("SELECT email FROM utilizator WHERE id_utilizator = :id_usr", id_usr=id_user)
             user_row = cursor.fetchone()
             if not user_row:
                 app.logger.error("Utilizator inexistent pentru plata %s", sesiune.get('id'))
@@ -334,39 +360,39 @@ def proceseaza_plata_reusita(sesiune):
             try:
                 cursor.execute(
                     "INSERT INTO tranzactie (uuid_tranzactie, id_utilizator, nr_bilete, revendicat) "
-                    "VALUES (:uid, :id, :nr, 0)",
-                    uid=uid_tranzactie, id=id_user, nr=nr_bilete)
+                    "VALUES (:uuid_val, :id_usr, :nr_val, 0)",
+                    uuid_val=uid_tranzactie, id_usr=id_user, nr_val=nr_bilete)
                 connection.commit()
             except oracledb.IntegrityError:
-                return  # două webhook-uri simultane: celălalt a inserat deja
+                return
 
-    # Email-ul se trimite după commit; dacă pică, UUID-ul rămâne vizibil pe site
     trimite_email_bilet(email, uid_tranzactie, nr_bilete)
 
 
 @app.route('/api/stripe/webhook', methods=['POST'])
 def stripe_webhook():
-    """Apelat de Stripe, server la server. Securitatea vine din semnătură, nu din sesiune."""
     if not STRIPE_WEBHOOK_SECRET:
         return "webhook neconfigurat", 500
 
     payload = request.get_data()
     semnatura = request.headers.get('Stripe-Signature', '')
 
-    # Fără verificarea semnăturii, oricine ar putea trimite un POST fals și primi bilete
     try:
         event = stripe.Webhook.construct_event(payload, semnatura, STRIPE_WEBHOOK_SECRET)
     except Exception:
         return "semnatura invalida", 400
 
     if event['type'] in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
-        obj = event['data']['object']
+        # NOU: Preluăm obiectul Stripe și îl convertim imediat într-un dicționar Python
+        obiect_stripe = event['data']['object']
+        obj = obiect_stripe.to_dict()
+
         if obj.get('payment_status') == 'paid':
             try:
                 proceseaza_plata_reusita(obj)
             except Exception:
                 app.logger.exception("Eroare la procesarea plății")
-                return "eroare interna", 500  # Stripe va retrimite webhook-ul
+                return "eroare interna", 500
 
     return "", 200
 
@@ -378,9 +404,16 @@ def api_tranzactiile_mele():
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT uuid_tranzactie, nr_bilete, revendicat FROM tranzactie "
-                "WHERE id_utilizator = :id", id=session['user_id'])
-            rezultate = [{"uuid": r[0], "nr_bilete": r[1], "revendicat": int(r[2] or 0)}
-                         for r in cursor.fetchall()]
+                "WHERE id_utilizator = :id_usr", id_usr=session['user_id'])
+
+            rezultate = []
+            for r in cursor.fetchall():
+                rezultate.append({
+                    "uuid": r[0].hex(),  # Dacă primești eroare la afișare, schimbă în r[0].hex()
+                    "nr_bilete": r[1],
+                    "revendicat": int(r[2] or 0)
+                })
+
     return jsonify(rezultate), 200
 
 
@@ -422,7 +455,14 @@ def api_admin_transactions():
             nume_coloane = [col[0].lower() for col in cursor.description]
             cursor.rowfactory = lambda *args: dict(zip(nume_coloane, args))
 
-            rezultate = cursor.fetchall()
+            rezultate_brute = cursor.fetchall()
+
+            rezultate = []
+            for rand in rezultate_brute:
+                # Decodăm valoarea brută din bytes în string text
+                rand['uuid_tranzactie'] = rand['uuid_tranzactie'].hex()
+                rezultate.append(rand)
+
             return jsonify(rezultate), 200
 
 
@@ -450,8 +490,8 @@ def api_add_transaction():
 
             id_user = user_row[0]
 
-            sql = "INSERT INTO tranzactie (uuid_tranzactie, id_utilizator, nr_bilete, revendicat) VALUES (:uid, :id, :nr, 0)"
-            cursor.execute(sql, uid=uid_tranzactie, id=id_user, nr=nr_bilete)
+            sql = "INSERT INTO tranzactie (uuid_tranzactie, id_utilizator, nr_bilete, revendicat) VALUES (:uuid_val, :id_usr, :nr_val, 0)"
+            cursor.execute(sql, uuid_val=uid_tranzactie, id_usr=id_user, nr_val=nr_bilete)
             connection.commit()
 
             email_trimis = trimite_email_bilet(email, uid_tranzactie, nr_bilete)
@@ -474,21 +514,19 @@ def api_validate_transaction():
 
     with pool.acquire() as connection:
         with connection.cursor() as cursor:
-            # Un singur UPDATE atomic: două scanări simultane nu pot trece amândouă
             cursor.execute(
-                "UPDATE tranzactie SET revendicat = 1 WHERE uuid_tranzactie = :uid AND revendicat = 0",
-                uid=uid_tranzactie)
+                "UPDATE tranzactie SET revendicat = 1 WHERE uuid_tranzactie = :uuid_val AND revendicat = 0",
+                uuid_val=uid_tranzactie)
 
             if cursor.rowcount == 1:
-                cursor.execute("SELECT nr_bilete FROM tranzactie WHERE uuid_tranzactie = :uid",
-                               uid=uid_tranzactie)
+                cursor.execute("SELECT nr_bilete FROM tranzactie WHERE uuid_tranzactie = :uuid_val",
+                               uuid_val=uid_tranzactie)
                 nr_bilete = cursor.fetchone()[0]
                 connection.commit()
                 return jsonify({"mesaj": "Tranzacție validată", "nr_bilete": nr_bilete}), 200
 
-            # Nu s-a actualizat nimic: fie nu există, fie era deja revendicată
-            cursor.execute("SELECT revendicat FROM tranzactie WHERE uuid_tranzactie = :uid",
-                           uid=uid_tranzactie)
+            cursor.execute("SELECT revendicat FROM tranzactie WHERE uuid_tranzactie = :uuid_val",
+                           uuid_val=uid_tranzactie)
             if cursor.fetchone() is None:
                 return jsonify({"eroare": "Tranzacție inexistentă"}), 404
             return jsonify({"deja_folosit": True}), 400
@@ -520,6 +558,5 @@ def api_make_user_admin():
 
 
 if __name__ == '__main__':
-    # debug doar la cerere: FLASK_DEBUG=1 în .env sau în terminal când dezvolți
     debug = os.getenv("FLASK_DEBUG") == "1"
     app.run(host='127.0.0.1', port=5000, debug=debug)
